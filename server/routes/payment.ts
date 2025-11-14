@@ -45,7 +45,7 @@ app.post("/", zValidator("json", createPaymentSchema), async (c) => {
   try {
     const paymentData = c.req.valid("json");
     console.log(
-      "📝 Creating payment with data:",
+      "Creating payment with data:",
       JSON.stringify(paymentData, null, 2),
     );
 
@@ -56,7 +56,7 @@ app.post("/", zValidator("json", createPaymentSchema), async (c) => {
     });
 
     console.log(
-      "✅ Zendfi API response:",
+      "Zendfi API response:",
       JSON.stringify(zendfiResponse, null, 2),
     );
 
@@ -82,19 +82,18 @@ app.post("/", zValidator("json", createPaymentSchema), async (c) => {
 app.get("/:id", async (c) => {
   try {
     const id = c.req.param("id");
-    console.log(`🔍 Getting payment: ${id}`);
+    console.log(`Getting payment: ${id}`);
 
     const zendfiResponse = await makeZendfiRequest(`/api/v1/payments/${id}`);
 
     console.log("Payment found:", JSON.stringify(zendfiResponse, null, 2));
 
-    // Just pass through the Zendfi response without validation
     return c.json({
       success: true,
       data: zendfiResponse,
     });
   } catch (error) {
-    console.error("❌ Error fetching payment:", error);
+    // console.error("❌ Error fetching payment:", error);
 
     if (error instanceof Error && error.message.includes("404")) {
       return c.json(
@@ -110,22 +109,9 @@ app.get("/:id", async (c) => {
     }
 
     throw new HTTPException(500, {
-      message: "Failed to fetch payment",
+      message: `Failed to fetch payment ${c.req.param("id")} ${error.message}`,
     });
   }
-});
-
-/**
- * GET /api/v1/payments
- * Get all payments (Note: Zendfi API doesn't have this endpoint)
- */
-app.get("/", async (c) => {
-  return c.json({
-    success: true,
-    data: [],
-    message:
-      "Zendfi API does not provide an endpoint to list all payments. Use GET /api/v1/payments/:id to fetch specific payments.",
-  });
 });
 
 export { app as paymentRoutes };

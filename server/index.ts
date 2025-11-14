@@ -1,11 +1,12 @@
+import "dotenv/config";
 import { serve } from "@hono/node-server";
 import { cors } from "hono/cors";
 import { logger } from "hono/logger";
-import { factory } from "./factory";
-import { paymentRoutes } from "./routes/payment";
+import { Hono } from "hono";
+import { zValidator } from "@hono/zod-validator";
+import { paymentRoutes } from "./routes/payment.js";
 
-// Create the main app using the factory
-const app = factory.createApp();
+const app = new Hono();
 
 // Global middleware
 app.use("*", logger());
@@ -19,19 +20,18 @@ app.use(
 );
 
 // Health check endpoint
-app.get("/", async (c) => {
-  const { PORT, NODE_ENV } = c.var;
+app.get("/", (c) => {
   return c.json({
     success: true,
     message: "Zendfi Payment API is running",
     version: "1.0.0",
-    environment: NODE_ENV,
-    port: PORT,
+    environment: process.env.NODE_ENV || "development",
+    port: process.env.PORT || 8000,
     timestamp: new Date().toISOString(),
   });
 });
 
-app.get("/health", async (c) => {
+app.get("/health", (c) => {
   return c.json({
     success: true,
     status: "healthy",
@@ -41,9 +41,6 @@ app.get("/health", async (c) => {
 
 // API routes
 app.route("/api/v1/payments", paymentRoutes);
-
-export const apiRoutes = app;
-export type ApiRoutes = typeof apiRoutes;
 
 // Start the server
 const port = Number(process.env.PORT || 8000);

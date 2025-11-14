@@ -1,34 +1,77 @@
-import { factory } from "../factory";
+import { Hono } from "hono";
 import { zValidator } from "@hono/zod-validator";
-import { createPaymentSchema, paymentResponseSchema } from "../zod/schemas";
-import { paymentService } from "../services/payment.service";
 import { HTTPException } from "hono/http-exception";
+import { createPaymentSchema, paymentResponseSchema } from "../zod/schemas.js";
 
-export const paymentRoutes = factory.createApp();
+const app = new Hono();
+
+// Get environment variables
+const ZENDFI_API_KEY = process.env.ZENDFI_API_KEY;
+const ZENDFI_API_URL = process.env.ZENDFI_API_URL || "https://api.zendfi.tech";
+
+if (!ZENDFI_API_KEY) {
+  console.error("❌ ZENDFI_API_KEY is required in environment variables");
+  process.exit(1);
+}
+
+// Helper function to make Zendfi API requests
+async function makeZendfiRequest(endpoint: string, options: RequestInit = {}) {
+  const url = `${ZENDFI_API_URL}${endpoint}`;
+
+  const response = await fetch(url, {
+    headers: {
+      Authorization: `Bearer ${ZENDFI_API_KEY}`,
+      "Content-Type": "application/json",
+      ...options.headers,
+    },
+    ...options,
+  });
+
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => ({}));
+    throw new Error(
+      `Zendfi API error: ${response.status} - ${JSON.stringify(errorData)}`,
+    );
+  }
+
+  return response.json();
+}
 
 /**
- * POST /payments
+ * POST /api/v1/payments
  * Create a new payment
  */
-paymentRoutes.post("/", zValidator("json", createPaymentSchema), async (c) => {
+app.post("/", zValidator("json", createPaymentSchema), async (c) => {
   try {
     const paymentData = c.req.valid("json");
+    console.log(
+      "📝 Creating payment with data:",
+      JSON.stringify(paymentData, null, 2),
+    );
 
-    // Create the payment
-    const payment = await paymentService.createPayment(paymentData);
+    // Make request to Zendfi API
+    const zendfiResponse = await makeZendfiRequest("/api/v1/payments", {
+      method: "POST",
+      body: JSON.stringify(paymentData),
+    });
 
-    // Validate the response against schema
-    const validatedPayment = paymentResponseSchema.parse(payment);
+    console.log(
+      "✅ Zendfi API response:",
+      JSON.stringify(zendfiResponse, null, 2),
+    );
+
+    // Validate response
+    const validatedResponse = paymentResponseSchema.parse(zendfiResponse);
 
     return c.json(
       {
         success: true,
-        data: validatedPayment,
+        data: validatedResponse,
       },
       201,
     );
   } catch (error) {
-    console.error("Error creating payment:", error);
+    console.error("❌ Error creating payment:", error);
     throw new HTTPException(500, {
       message: "Failed to create payment",
     });
@@ -36,35 +79,40 @@ paymentRoutes.post("/", zValidator("json", createPaymentSchema), async (c) => {
 });
 
 /**
- * GET /payments/:id
+ * GET /api/v1/payments/:id
  * Get payment by ID
  */
-paymentRoutes.get("/:id", async (c) => {
+app.get("/:id", async (c) => {
   try {
     const id = c.req.param("id");
-    const payment = await paymentService.getPayment(id);
+    console.log(`🔍 Getting payment: ${id}`);
 
-    if (!payment) {
+    const zendfiResponse = await makeZendfiRequest(`/api/v1/payments/${id}`);
+
+    console.log("Payment found:", JSON.stringify(zendfiResponse, null, 2));
+
+    const validatedResponse = paymentResponseSchema.parse(zendfiResponse);
+
+    return c.json({
+      success: true,
+      data: validatedResponse,
+    });
+  } catch (error) {
+    console.error("❌ Error fetching payment:", error);
+
+    if (error instanceof Error && error.message.includes("404")) {
       return c.json(
         {
           success: false,
           error: {
             code: "PAYMENT_NOT_FOUND",
-            message: `Payment with ID ${id} not found`,
+            message: `Payment with ID ${c.req.param("id")} not found`,
           },
         },
         404,
       );
     }
 
-    const validatedPayment = paymentResponseSchema.parse(payment);
-
-    return c.json({
-      success: true,
-      data: validatedPayment,
-    });
-  } catch (error) {
-    console.error("Error fetching payment:", error);
     throw new HTTPException(500, {
       message: "Failed to fetch payment",
     });
@@ -72,63 +120,16 @@ paymentRoutes.get("/:id", async (c) => {
 });
 
 /**
- * GET /payments
- * Get all payments
+ * GET /api/v1/payments
+ * Get all payments (Note: Zendfi API doesn't have this endpoint)
  */
-paymentRoutes.get("/", async (c) => {
-  try {
-    const payments = await paymentService.getAllPayments();
-
-    // Validate all payments
-    const validatedPayments = payments.map((payment) =>
-      paymentResponseSchema.parse(payment),
-    );
-
-    return c.json({
-      success: true,
-      data: validatedPayments,
-      meta: {
-        count: validatedPayments.length,
-      },
-    });
-  } catch (error) {
-    console.error("Error fetching payments:", error);
-    throw new HTTPException(500, {
-      message: "Failed to fetch payments",
-    });
-  }
+app.get("/", async (c) => {
+  return c.json({
+    success: true,
+    data: [],
+    message:
+      "Zendfi API does not provide an endpoint to list all payments. Use GET /api/v1/payments/:id to fetch specific payments.",
+  });
 });
 
-/**
- * DELETE /payments/:id
- * Delete payment by ID
- */
-paymentRoutes.delete("/:id", async (c) => {
-  try {
-    const id = c.req.param("id");
-    const deleted = await paymentService.deletePayment(id);
-
-    if (!deleted) {
-      return c.json(
-        {
-          success: false,
-          error: {
-            code: "PAYMENT_NOT_FOUND",
-            message: `Payment with ID ${id} not found`,
-          },
-        },
-        404,
-      );
-    }
-
-    return c.json({
-      success: true,
-      message: "Payment deleted successfully",
-    });
-  } catch (error) {
-    console.error("Error deleting payment:", error);
-    throw new HTTPException(500, {
-      message: "Failed to delete payment",
-    });
-  }
-});
+export { app as paymentRoutes };

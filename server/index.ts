@@ -49,8 +49,6 @@ console.log(`🚀 Zendfi Payment API is running on http://localhost:${port}`);
 console.log(`📖 API Documentation:`);
 console.log(`   POST /api/v1/payments - Create a new payment`);
 console.log(`   GET  /api/v1/payments/:id - Get payment by ID`);
-console.log(`   GET  /api/v1/payments - Get all payments`);
-console.log(`   DELETE /api/v1/payments/:id - Delete payment`);
 console.log(`   GET  /health - Health check`);
 
 serve({

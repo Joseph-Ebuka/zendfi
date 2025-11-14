@@ -1,7 +1,7 @@
 import { Hono } from "hono";
 import { zValidator } from "@hono/zod-validator";
 import { HTTPException } from "hono/http-exception";
-import { createPaymentSchema, paymentResponseSchema } from "../zod/schemas.js";
+import { createPaymentSchema } from "../zod/schemas.js";
 
 const app = new Hono();
 
@@ -60,13 +60,10 @@ app.post("/", zValidator("json", createPaymentSchema), async (c) => {
       JSON.stringify(zendfiResponse, null, 2),
     );
 
-    // Validate response
-    const validatedResponse = paymentResponseSchema.parse(zendfiResponse);
-
     return c.json(
       {
         success: true,
-        data: validatedResponse,
+        data: zendfiResponse,
       },
       201,
     );
@@ -91,11 +88,10 @@ app.get("/:id", async (c) => {
 
     console.log("Payment found:", JSON.stringify(zendfiResponse, null, 2));
 
-    const validatedResponse = paymentResponseSchema.parse(zendfiResponse);
-
+    // Just pass through the Zendfi response without validation
     return c.json({
       success: true,
-      data: validatedResponse,
+      data: zendfiResponse,
     });
   } catch (error) {
     console.error("❌ Error fetching payment:", error);

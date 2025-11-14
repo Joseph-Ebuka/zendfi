@@ -10,7 +10,7 @@ const ZENDFI_API_KEY = process.env.ZENDFI_API_KEY;
 const ZENDFI_API_URL = process.env.ZENDFI_API_URL || "https://api.zendfi.tech";
 
 if (!ZENDFI_API_KEY) {
-  console.error("❌ ZENDFI_API_KEY is required in environment variables");
+  console.error(" ZENDFI_API_KEY is required in environment variables");
   process.exit(1);
 }
 
@@ -93,7 +93,7 @@ app.get("/:id", async (c) => {
       data: zendfiResponse,
     });
   } catch (error) {
-    // console.error("❌ Error fetching payment:", error);
+    // console.error("Error fetching payment:", error);
 
     if (error instanceof Error && error.message.includes("404")) {
       return c.json(
